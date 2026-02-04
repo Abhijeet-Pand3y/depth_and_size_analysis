@@ -4,3 +4,4 @@ model_params:
   intercept: -0.2532761114255172
   focal_length_px: 3721.2
 save_file: False
+input_files: './input_images/test/demo/20.jpg'

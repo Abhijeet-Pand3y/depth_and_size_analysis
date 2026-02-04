@@ -209,12 +209,17 @@ class CalculateArea:
             
     
 if __name__ == '__main__':
+    with open('./config.yaml', 'r') as file:
+            config = yaml.safe_load(file)
+    
+    input_files = config['input_files']
+
     parser = argparse.ArgumentParser(description='Depth Anything V2')
 
     parser.add_argument('--encoder', type=str, default='vitl')
     parser.add_argument('--input-size', type=int, default=518)
 
-    parser.add_argument('--img-path', type=str, default='./input_images/test/demo/20.jpg')
+    parser.add_argument('--img-path', type=str, default=input_files)
     parser.add_argument('--outdir', type=str, default='./vis_depth')
 
     parser.add_argument('--load-from', type=str, default='checkpoints/depth_anything_v2_metric_hypersim_vitl.pth')
