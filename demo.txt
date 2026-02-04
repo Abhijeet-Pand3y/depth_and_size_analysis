@@ -1,0 +1,10 @@
+24-ball4
+18- ball4
+20- ball 3
+30 - ball 5
+
+
+limitation
+11 - double ball 3 and 4
+27 - tilt
+15 - ground for ball 1
