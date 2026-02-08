@@ -8,6 +8,7 @@ import os
 import yaml
 import re
 import csv
+import joblib
 
 from sam_run import SegmentAnythingModelRun
 from depthanything import DepthAnythingRunner
@@ -78,6 +79,25 @@ class CalculateArea:
 
         return depth
 
+    def get_spatial_features(self, ball_contour, image_width, image_height):
+        c_x, c_y = image_width / 2, image_height / 2
+        
+        M = cv2.moments(ball_contour)
+        if M["m00"] != 0:
+            u = int(M["m10"] / M["m00"])
+            v = int(M["m01"] / M["m00"])
+        else:
+            x, y, w, h = cv2.boundingRect(ball_contour)
+            u, v = x + w/2, y + h/2
+
+
+        raw_dist = np.sqrt((u - c_x)**2 + (v - c_y)**2)
+        
+        max_dist = np.sqrt(c_x**2 + c_y**2)
+        normalized_dist = raw_dist / max_dist
+        
+        return normalized_dist
+
     def calculate_depth_and_area(self, raw_img):
         img_rgb = cv2.cvtColor(raw_img, cv2.COLOR_BGR2RGB)
 
@@ -137,24 +157,37 @@ class CalculateArea:
 
         return ellipse_diameter, circle_diameter
     
-    def calculate_area_and_depth(self, raw_img):
+    def process_area_and_depth(self, raw_img):
         final_depth_val, ball_countour, number_of_pixel = self.calculate_depth_and_area(raw_img)
+        distance_to_center = self.get_spatial_features(ball_countour, raw_img.shape[1], raw_img.shape[0])
 
         with open('./config.yaml', 'r') as file:
             config = yaml.safe_load(file)
         
-        slope = config['model_params']['slope']
-        intercept = config['model_params']['intercept']
+        # slope = config['model_params']['slope']
+        # intercept = config['model_params']['intercept']
         focal_length_in_px = config['model_params']['focal_length_px']
 
-        real_depth = slope * final_depth_val + intercept
+        # real_depth = slope * final_depth_val + intercept
+
+        loaded_pipe = joblib.load('./regression/size_estimation_pipeline.pkl')
+
+        new_obs = np.array([[final_depth_val, distance_to_center, np.log10(number_of_pixel)]])
+        
+        real_depth = loaded_pipe.predict(new_obs)[0]
 
 
         print(f"Real Depth: {real_depth}")
 
         ellipse_diameter, circle_diameter = self.get_diameter(real_depth, ball_countour,number_of_pixel, focal_length_in_px)
 
-        info = {"ellipse_diameter":ellipse_diameter, "circle_diameter": circle_diameter, "real_depth" : real_depth, "relative_depth": final_depth_val, "number_of_pixel": number_of_pixel}
+        info = {"ellipse_diameter":ellipse_diameter, 
+                "circle_diameter": circle_diameter, 
+                "real_depth" : real_depth, 
+                "relative_depth": final_depth_val, 
+                "number_of_pixel": number_of_pixel,
+                "distance_to_center": distance_to_center,
+                }
 
         return info
 
@@ -173,11 +206,11 @@ class CalculateArea:
             if img is None:
                 continue
             key = re.findall(r'(\d+\.?\d*m?)\.jpg', filename)[0]
-            img_dict[key] = self.calculate_area_and_depth(img)
+            img_dict[key] = self.process_area_and_depth(img)
         
         return img_dict
 
-    def save_csv(self, img_dict, filename="./results/demo.csv"):
+    def save_csv(self, img_dict, filename="./results/new_ball3.csv"):
 
         fieldnames = [
             'Image_ID', 
@@ -232,15 +265,14 @@ if __name__ == '__main__':
 
     calculateArea = CalculateArea(args)
 
-    # diameter = calculateArea.calculate_area_and_depth()
+    # diameter = calculateArea.process_area_and_depth()
 
     img_dict = calculateArea.extract_image()
 
     with open('./config.yaml', 'r') as file:
             config = yaml.safe_load(file)
     
-    save_file = config['save_file']
-
+    save_file = False
     if save_file:
         calculateArea.save_csv(img_dict)
 

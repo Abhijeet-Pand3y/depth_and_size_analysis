@@ -15,8 +15,8 @@ sam.to(device=device)
 predictor = SamPredictor(sam)
 
 # --- 2. Load Image ---
-filename = '11.jpg'
-image_path = f'./input_images/test/demo/{filename}'
+filename = '28.jpg'
+image_path = f'./input_images/test/{filename}'
 image = cv2.imread(image_path)
 if image is None:
     print(f"Error: Could not find image at {image_path}")
